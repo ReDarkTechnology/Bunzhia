@@ -9,6 +9,7 @@ using OpenTK.Graphics.OpenGL4;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
 using OpenTK.Windowing.GraphicsLibraryFramework;
+using Bunzhia.Graphics;
 
 namespace Bunzhia
 {
@@ -92,7 +93,7 @@ namespace Bunzhia
             new (0, 0)
         };
 
-        uint[] indices =
+        List<uint> indices = new List<uint>
         {
             0, 1, 2,
             2, 3, 0,
@@ -114,16 +115,13 @@ namespace Bunzhia
         };
 
         // Render pipeline
-        int vao;
-        int vbo;
-        int ebo;
-        int shaderProgram;
-        int textureID;
-        int textureVBO;
+        VAO vao;
+        IBO ibo;
+        ShaderProgram program;
+        Texture texture;
 
         // Transformation variables
         float yRot = 0f;
-
         Camera camera;
         #endregion
 
@@ -135,6 +133,7 @@ namespace Bunzhia
 
             // Center the window on monitor
             CenterWindow(new Vector2i(width, height));
+            camera = new(width, height, Vector3.Zero);
         }
         #endregion
 
@@ -154,114 +153,43 @@ namespace Bunzhia
         {
             base.OnLoad();
 
-            // Start creating the VAO
-            vao = GL.GenVertexArray();
+            vao = new VAO();
+            VBO vbo = new VBO(vertices);
+            vao.LinkToVAO(0, 3, vbo);
+            vbo.Unbind();
 
-            // Bind the VAO
-            GL.BindVertexArray(vao);
+            VBO uvVBO = new VBO(texCoords);
+            vao.LinkToVAO(1, 2, uvVBO);
+            uvVBO.Unbind();
 
-            // Create the VBO Buffer
-            vbo = GL.GenBuffer();
-
-            // Start using the VBO and draw the buffer data
-            GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
-            GL.BufferData(BufferTarget.ArrayBuffer, vertices.Count * Vector3.SizeInBytes, vertices.ToArray(), BufferUsageHint.StaticDraw);
-
-            // Put the vertex VBO in slot 0 of our VAO
-            // Enable VAO Slot 0 and bind the vbo to the slot
-            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 0, 0);
-            GL.EnableVertexArrayAttrib(vao, 0);
-            GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
-
-            // Create the VBO Buffer for the texture
-            textureVBO = GL.GenBuffer();
-            GL.BindBuffer(BufferTarget.ArrayBuffer, textureVBO);
-            GL.BufferData(BufferTarget.ArrayBuffer, texCoords.Count * Vector2.SizeInBytes, texCoords.ToArray(), BufferUsageHint.StaticDraw);
-
-
-            // Enable VAO Slot 1 and bind the texture data to the slot
-            GL.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 0, 0);
-            GL.EnableVertexArrayAttrib(vao, 1);
-
-            // Unbinding the vbo and vao
-            GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
-            GL.BindVertexArray(0);
-
-            // Putting the indices into a buffer
-            ebo = GL.GenBuffer();
-            GL.BindBuffer(BufferTarget.ElementArrayBuffer, ebo);
-            GL.BufferData(BufferTarget.ElementArrayBuffer, indices.Length * sizeof(uint), indices, BufferUsageHint.StaticDraw);
-            GL.BindBuffer(BufferTarget.ElementArrayBuffer, 0);
-
-            // The length has to be multiplied becauses we want the length in memory and not the array length
-
-            // Create the shader program
-            shaderProgram = GL.CreateProgram();
-
-            // Create the actual shaders
-            int vertexShader = GL.CreateShader(ShaderType.VertexShader);
-            GL.ShaderSource(vertexShader, LoadShaderSource("Default.vert"));
-            GL.CompileShader(vertexShader);
-
-            int fragmentShader = GL.CreateShader(ShaderType.FragmentShader);
-            GL.ShaderSource(fragmentShader, LoadShaderSource("Default.frag"));
-            GL.CompileShader(fragmentShader);
-
-            // Put the shaders into the program
-            GL.AttachShader(shaderProgram, vertexShader);
-            GL.AttachShader(shaderProgram, fragmentShader);
-
-            // Link the program to the GL Context
-            GL.LinkProgram(shaderProgram);
-
-            // Free the memory by deleting the shader
-            GL.DeleteShader(vertexShader);
-            GL.DeleteShader(fragmentShader);
-
-            // Prepare texture texture
-            textureID = GL.GenTexture();
-
-            // Activate texture in the unit
-            GL.ActiveTexture(TextureUnit.Texture0);
-            GL.BindTexture(TextureTarget.Texture2D, textureID);
-
-            // Texture parameters
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
-
-            // Load image
-            StbImage.stbi_set_flip_vertically_on_load(1);
-            ImageResult dirtTexture = ImageResult.FromStream(File.OpenRead("../../../Textures/Dirt.jpg"), ColorComponents.RedGreenBlueAlpha);
-
-            // Give image data to OpenGL
-            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, dirtTexture.Width, dirtTexture.Height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, dirtTexture.Data);
-            // Unbind texture
-            GL.BindTexture(TextureTarget.Texture2D, 0);
+            ibo = new IBO(indices);
+            program = new ShaderProgram("Default.vert", "Default.frag");
+            texture = new Texture("Dirt.jpg");
 
             GL.Enable(EnableCap.DepthTest);
-
-            camera = new(width, height, Vector3.Zero);
+            CursorState = CursorState.Grabbed;
         }
 
         protected override void OnUnload()
         {
             base.OnUnload();
 
-            GL.DeleteVertexArray(vao);
-            GL.DeleteBuffer(vbo);
-            GL.DeleteBuffer(ebo);
-            GL.DeleteTexture(textureID);
-            GL.DeleteProgram(shaderProgram);
+            vao.Delete();
+            ibo.Delete();
+            texture.Delete();
+            program.Delete();
         }
         #endregion
 
         #region Updates
         protected override void OnUpdateFrame(FrameEventArgs args)
         {
+            MouseState mouse = MouseState;
+            KeyboardState input = KeyboardState;
+
             base.OnUpdateFrame(args);
-            yRot += 1 * (float)args.Time;
+            yRot += 2 * (float)args.Time;
+            camera?.Update(input, mouse, args);
         }
 
         protected override void OnRenderFrame(FrameEventArgs args)
@@ -269,13 +197,10 @@ namespace Bunzhia
             GL.ClearColor(0.6f, 0.3f, 1f, 1f);
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-            // Draw triangle
-            GL.UseProgram(shaderProgram);
-
-            GL.BindVertexArray(vao);
-            GL.BindBuffer(BufferTarget.ElementArrayBuffer, ebo);
-
-            GL.BindTexture(TextureTarget.Texture2D, textureID);
+            program.Bind();
+            vao.Bind();
+            ibo.Bind();
+            texture.Bind();
 
             // Transformation Matrices
             Matrix4 model = Matrix4.Identity;
@@ -285,15 +210,15 @@ namespace Bunzhia
             model = Matrix4.CreateRotationY(yRot);
             model *= Matrix4.CreateTranslation(0, 0, -3f);
 
-            int modelLocation = GL.GetUniformLocation(shaderProgram, "model");
-            int viewLocation = GL.GetUniformLocation(shaderProgram, "view");
-            int projectionLocation = GL.GetUniformLocation(shaderProgram, "projection");
+            int modelLocation = GL.GetUniformLocation(program.Id, "model");
+            int viewLocation = GL.GetUniformLocation(program.Id, "view");
+            int projectionLocation = GL.GetUniformLocation(program.Id, "projection");
 
             GL.UniformMatrix4(modelLocation, true, ref model);
             GL.UniformMatrix4(viewLocation, true, ref view);
             GL.UniformMatrix4(projectionLocation, true, ref projection);
 
-            GL.DrawElements(PrimitiveType.Triangles, indices.Length, DrawElementsType.UnsignedInt, 0);
+            GL.DrawElements(PrimitiveType.Triangles, indices.Count, DrawElementsType.UnsignedInt, 0);
 
             Context.SwapBuffers();
 
@@ -302,14 +227,6 @@ namespace Bunzhia
         #endregion
 
         #region Utility
-        // Function to load a text file and return its contents as a string
-        public static string LoadShaderSource(string filePath)
-        {
-            string path = "../../../Shaders/" + filePath;
-            if (File.Exists(path))
-                return File.ReadAllText(path);
-            return null;
-        }
         #endregion
     }
 }
