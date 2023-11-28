@@ -1,7 +1,4 @@
-﻿using Bunzhia.Graphics;
-using OpenTK.Graphics.OpenGL4;
-using System;
-using System.Collections.Generic;
+﻿using OpenTK.Graphics.OpenGL4;
 
 namespace Bunzhia.Graphics
 {

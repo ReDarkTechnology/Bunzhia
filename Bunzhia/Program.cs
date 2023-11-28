@@ -4,7 +4,7 @@ namespace Bunzhia;
 
 public static class Program
 {
-    public static Game? game;
+    public static Game game;
     [STAThread]
     static void Main(string[] args)
     {
