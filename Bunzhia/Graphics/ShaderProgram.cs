@@ -4,7 +4,7 @@ using OpenTK.Graphics.OpenGL4;
 
 namespace Bunzhia.Graphics
 {
-    internal class ShaderProgram
+    public class ShaderProgram
     {
         public int Id { get; private set; }
         public ShaderProgram(string vertexShaderPath, string fragmentShaderPath)
